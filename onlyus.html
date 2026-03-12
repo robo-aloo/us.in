@@ -129,7 +129,7 @@ body.blur-ss #app{filter:blur(20px)}
 .mw{display:flex;flex-direction:column;max-width:78%}
 .mw.me{align-self:flex-end;align-items:flex-end}
 .mw.them{align-self:flex-start;align-items:flex-start}
-.bub{padding:9px 13px;font-size:14px;line-height:1.5;word-break:break-word;border-radius:14px}
+.bub{padding:10px 14px;font-size:16px;line-height:1.6;word-break:break-word;border-radius:14px}
 .mw.me .bub{background:var(--me);border-bottom-right-radius:3px}
 .mw.them .bub{background:var(--them);border:1px solid var(--bdr);border-bottom-left-radius:3px}
 .bub img{max-width:170px;max-height:190px;border-radius:8px;display:block;cursor:pointer}
@@ -140,7 +140,7 @@ body.blur-ss #app{filter:blur(20px)}
 /* INPUT BAR */
 #ibar{padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--bdr);flex-shrink:0}
 .irow{display:flex;gap:6px;align-items:flex-end}
-#mi{flex:1;min-height:40px;max-height:100px;padding:9px 14px;background:var(--inp);border:1.5px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:14px;border-radius:22px;outline:none;resize:none;line-height:1.4;transition:border-color .2s;-webkit-appearance:none}
+#mi{flex:1;min-height:44px;max-height:100px;padding:10px 16px;background:var(--inp);border:1.5px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:16px;border-radius:22px;outline:none;resize:none;line-height:1.4;transition:border-color .2s;-webkit-appearance:none}
 #mi:focus{border-color:var(--p)}
 #mi::placeholder{color:var(--sub)}
 .sndb{width:40px;height:40px;flex-shrink:0;border-radius:50%;background:linear-gradient(135deg,var(--p),#6a52e0);border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .1s;outline:none}
@@ -678,6 +678,8 @@ function setupIceHandler() {
 
 // ── DATA CHANNEL ─────────────────────────────────
 function wireChannel(ch) {
+  const imgChunks = {}; // reassembly buffer for chunked images
+
   ch.onopen = () => {
     setCS('y', 'exchanging keys\u2026');
     dcSend({t:'KEY', k:nacl.util.encodeBase64(KP.publicKey), n:myName});
@@ -718,6 +720,23 @@ function wireChannel(ch) {
     if (d.t === 'ROK') { toast('\u2736 Reconnect accepted'); closeR(); return; }
     if (d.t === 'RNO') { toast('Reconnect declined'); return; }
 
+    // Video renegotiation
+    if (d.t === 'OFFER') {
+      const sdp = decT(d.d);
+      if (!sdp || !pc) return;
+      pc.setRemoteDescription({type:'offer', sdp}).then(() => pc.createAnswer())
+        .then(a => pc.setLocalDescription(a))
+        .then(() => dcSend({t:'ANSWER', d:encT(pc.localDescription.sdp)}))
+        .catch(()=>{});
+      return;
+    }
+    if (d.t === 'ANSWER') {
+      const sdp = decT(d.d);
+      if (!sdp || !pc) return;
+      pc.setRemoteDescription({type:'answer', sdp}).catch(()=>{});
+      return;
+    }
+
     if (d.t === 'MSG') {
       const txt = decT(d.d);
       if (txt !== null) addMsg(txt, 'them');
@@ -725,6 +744,23 @@ function wireChannel(ch) {
       return;
     }
 
+    // Chunked image reassembly
+    if (d.t === 'IMC') {
+      if (!imgChunks[d.id]) imgChunks[d.id] = {chunks: new Array(d.tot), mime: d.m, got: 0};
+      imgChunks[d.id].chunks[d.idx] = d.d;
+      imgChunks[d.id].got++;
+      if (imgChunks[d.id].got === d.tot) {
+        const full  = imgChunks[d.id].chunks.join('');
+        const mime  = imgChunks[d.id].mime || 'image/jpeg';
+        delete imgChunks[d.id];
+        const bytes = decB(full);
+        if (bytes) addImgMsg(URL.createObjectURL(new Blob([bytes], {type: mime})), 'them');
+        else addSys('\u26A0\uFE0F Photo could not be decrypted');
+      }
+      return;
+    }
+
+    // Legacy single-chunk image
     if (d.t === 'IMG') {
       const bytes = decB(d.d);
       if (bytes) addImgMsg(URL.createObjectURL(new Blob([bytes], {type: d.m || 'image/jpeg'})), 'them');
@@ -734,7 +770,7 @@ function wireChannel(ch) {
 
   ch.onclose = () => {
     setCS('r', 'disconnected');
-    addSys(peerName + ' left the room');
+    addSys((peerName || 'Them') + ' left the room');
     SK = null; locked = false;
     G('bw').classList.add('on');
     scheduleWipe();
@@ -764,8 +800,16 @@ function onFile(e) {
   if (f.size > 8388608) { toast('Max 8MB'); return; }
   const reader = new FileReader();
   reader.onload = ev => {
-    const bytes = new Uint8Array(ev.target.result);
-    dcSend({t:'IMG', d:encB(bytes), m:f.type});
+    const bytes  = new Uint8Array(ev.target.result);
+    const CHUNK  = 12000; // safe datachannel chunk size
+    const enc    = encB(bytes);
+    // split encrypted string into chunks
+    const chunks = [];
+    for (let i = 0; i < enc.length; i += CHUNK) chunks.push(enc.slice(i, i + CHUNK));
+    const id = Date.now().toString(36);
+    chunks.forEach((ch, idx) => {
+      dcSend({t:'IMC', id, idx, tot:chunks.length, d:ch, m:f.type});
+    });
     addImgMsg(URL.createObjectURL(f), 'me');
     toast('Photo sent \u2736');
   };
@@ -786,9 +830,20 @@ async function toggleCam() {
       G('vph').style.display = 'none';
       G('bcam').classList.add('on');
       G('bmic').classList.add('on');
-      if (pc && pc.signalingState !== 'closed')
+      // Add tracks then renegotiate via datachannel
+      if (pc && pc.signalingState !== 'closed') {
         vs.getTracks().forEach(t => pc.addTrack(t, vs));
-      toast('Video on \u00B7 DTLS-SRTP');
+        // Manual renegotiation over encrypted datachannel
+        pc.onnegotiationneeded = async () => {
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            if (dc && dc.readyState === 'open' && SK)
+              dcSend({t:'OFFER', d:encT(pc.localDescription.sdp)});
+          } catch(e) {}
+        };
+      }
+      toast('Video on \u00B7 DTLS-SRTP \u2736');
       wakeLock();
     } catch(e) { toast('Camera denied \u2014 allow in browser settings'); }
   } else {
@@ -815,8 +870,22 @@ function setRemoteVid(stream) {
 
 // ── RECONNECT ────────────────────────────────────
 function onBell() {
-  if (isReady()) { dcSend({t:'RRQ', n:myName}); toast('Request sent'); }
-  else { isHost ? hostFlow() : joinFlow(); toast('Reconnecting\u2026'); }
+  if (isReady()) {
+    // Connected — send reconnect request to other side
+    dcSend({t:'RRQ', n:myName});
+    toast('Reconnect request sent');
+  } else {
+    // DC is closed — restart full flow
+    cleanup();
+    toast('Reconnecting\u2026');
+    if (isHost) {
+      newKP();
+      hostFlow();
+    } else {
+      newKP();
+      joinFlow();
+    }
+  }
 }
 function showReconn(name) { G('rpsub').textContent = name + ' wants to reconnect'; G('rp').classList.add('on'); }
 function closeR() { G('rp').classList.remove('on'); }
