@@ -40,7 +40,7 @@ body.blur-ss #app{filter:blur(20px)}
 .inp:focus{border-color:var(--p)}
 .inp::placeholder{color:var(--sub)}
 
-/* PASSWORD — eye is flex sibling, NOT absolute */
+/* PASSWORD — eye is flex sibling NOT absolute */
 .pwrow{display:flex;gap:8px}
 .pwrow .inp{flex:1}
 .eye{width:46px;height:46px;flex-shrink:0;background:var(--inp);border:1.5px solid var(--bdr);border-radius:10px;color:var(--sub);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;outline:none;transition:border-color .2s,color .2s}
@@ -262,7 +262,7 @@ body.blur-ss #app{filter:blur(20px)}
     <div class="clbl">Join room</div>
     <div class="field">
       <div class="flbl">Room code</div>
-      <input class="inp" type="text" id="icode" placeholder="Enter code" maxlength="8" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,\'\')">
+      <input class="inp" type="text" id="icode" placeholder="Enter code" maxlength="8" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
     </div>
     <div class="steps" id="jsteps" style="display:none">
       <div class="step sa" id="js1"><span class="si">&#x26A1;</span>Connecting to Cloudflare&hellip;</div>
@@ -303,7 +303,7 @@ body.blur-ss #app{filter:blur(20px)}
     <div id="ibar">
       <div class="irow">
         <input type="file" id="fi" accept="image/*" onchange="onFile(event)">
-        <button class="attb" type="button" onclick="document.getElementById(\'fi\').click()">&#x1F4CE;</button>
+        <button class="attb" type="button" onclick="document.getElementById('fi').click()">&#x1F4CE;</button>
         <textarea id="mi" rows="1" placeholder="Message&hellip;" onkeydown="onKey(event)" oninput="grow(this)"></textarea>
         <button class="sndb" type="button" onclick="sendMsg()">&#x27A4;</button>
       </div>
@@ -358,14 +358,17 @@ body.blur-ss #app{filter:blur(20px)}
 <div id="lb" onclick="closeLB()"><img id="lbi" src="" alt=""></div>
 <div id="toast"></div>
 </div>
+
 <script>
 'use strict';
 
-// PASTE YOUR CLOUDFLARE WORKER URL HERE
-// e.g. https://onlyus.yourname.workers.dev
-var CF = 'PASTE_YOUR_WORKER_URL_HERE';
+// ═══════════════════════════════════════
+//  PASTE YOUR CLOUDFLARE WORKER URL HERE
+//  e.g. https://onlyus.yourname.workers.dev
+// ═══════════════════════════════════════
+const CF = 'PASTE_YOUR_WORKER_URL_HERE';
 
-var ICE_CFG = {
+const ICE_CFG = {
   iceServers: [
     {urls:'stun:stun.l.google.com:19302'},
     {urls:'stun:stun1.l.google.com:19302'},
@@ -376,7 +379,7 @@ var ICE_CFG = {
     {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
     {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
   ],
-  iceCandidatePoolSize:10
+  iceCandidatePoolSize: 10
 };
 
 // ── CF API ──────────────────────────────────────
@@ -384,7 +387,7 @@ async function cfWrite(room, key, val) {
   try {
     await fetch(CF + '?a=' + key + '&r=' + room, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(val)
     });
   } catch(e) { console.warn('cfWrite', e); }
@@ -392,17 +395,17 @@ async function cfWrite(room, key, val) {
 
 async function cfRead(room, key) {
   try {
-    var r = await fetch(CF + '?a=' + key + '&r=' + room);
-    var j = await r.json();
+    const r = await fetch(CF + '?a=' + key + '&r=' + room);
+    const j = await r.json();
     return j.data ? JSON.parse(j.data) : null;
   } catch(e) { return null; }
 }
 
 async function cfPoll(room, key, ms, iv) {
   ms = ms || 30000; iv = iv || 1200;
-  var end = Date.now() + ms;
+  const end = Date.now() + ms;
   while (Date.now() < end) {
-    var d = await cfRead(room, key);
+    const d = await cfRead(room, key);
     if (d !== null) return d;
     await sleep(iv);
   }
@@ -410,13 +413,13 @@ async function cfPoll(room, key, ms, iv) {
 }
 
 // ── KDF ─────────────────────────────────────────
-var KDF_SALT = new TextEncoder().encode('onlyus-v2-2024');
+const KDF_SALT = new TextEncoder().encode('onlyus-v2-2024');
 
 async function deriveKey(pw) {
   kdfShow(true, 5); await sleep(10);
-  var mat = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw.trim()), 'PBKDF2', false, ['deriveBits']);
+  const mat = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw.trim()), 'PBKDF2', false, ['deriveBits']);
   kdfShow(true, 22); await sleep(10);
-  var bits = await crypto.subtle.deriveBits({name:'PBKDF2', hash:'SHA-512', salt:KDF_SALT, iterations:600000}, mat, 256);
+  const bits = await crypto.subtle.deriveBits({name:'PBKDF2', hash:'SHA-512', salt:KDF_SALT, iterations:600000}, mat, 256);
   kdfShow(true, 100); await sleep(80);
   kdfShow(false, 0);
   return new Uint8Array(bits);
@@ -429,92 +432,92 @@ function kdfShow(on, pct) {
 }
 
 // ── CRYPTO ───────────────────────────────────────
-var KP = null, SK = null, PH = null;
+let KP = null, SK = null, PH = null;
 
 function newKP() { KP = nacl.box.keyPair(); }
 
 function makeSK(pub64, ph) {
-  var dh = nacl.scalarMult(KP.secretKey, nacl.util.decodeBase64(pub64));
-  var mix = new Uint8Array(64);
+  const dh  = nacl.scalarMult(KP.secretKey, nacl.util.decodeBase64(pub64));
+  const mix = new Uint8Array(64);
   mix.set(dh, 0); mix.set(ph, 32);
   return nacl.hash(mix).slice(0, 32);
 }
 
 function encT(txt) {
-  var n = nacl.randomBytes(24);
-  var c = nacl.secretbox(nacl.util.decodeUTF8(txt), n, SK);
+  const n = nacl.randomBytes(24);
+  const c = nacl.secretbox(nacl.util.decodeUTF8(txt), n, SK);
   return nacl.util.encodeBase64(n) + '.' + nacl.util.encodeBase64(c);
 }
 
 function decT(cipher) {
   try {
-    var i = cipher.indexOf('.');
-    var n = nacl.util.decodeBase64(cipher.slice(0, i));
-    var c = nacl.util.decodeBase64(cipher.slice(i + 1));
-    var o = nacl.secretbox.open(c, n, SK);
+    const i = cipher.indexOf('.');
+    const n = nacl.util.decodeBase64(cipher.slice(0, i));
+    const c = nacl.util.decodeBase64(cipher.slice(i + 1));
+    const o = nacl.secretbox.open(c, n, SK);
     return o ? nacl.util.encodeUTF8(o) : null;
   } catch(e) { return null; }
 }
 
 function encB(bytes) {
-  var n = nacl.randomBytes(24);
-  var c = nacl.secretbox(bytes, n, SK);
+  const n = nacl.randomBytes(24);
+  const c = nacl.secretbox(bytes, n, SK);
   return nacl.util.encodeBase64(n) + '.' + nacl.util.encodeBase64(c);
 }
 
 function decB(cipher) {
   try {
-    var i = cipher.indexOf('.');
-    var n = nacl.util.decodeBase64(cipher.slice(0, i));
-    var c = nacl.util.decodeBase64(cipher.slice(i + 1));
+    const i = cipher.indexOf('.');
+    const n = nacl.util.decodeBase64(cipher.slice(0, i));
+    const c = nacl.util.decodeBase64(cipher.slice(i + 1));
     return nacl.secretbox.open(c, n, SK);
   } catch(e) { return null; }
 }
 
 // ── PASSWORD TOGGLE ──────────────────────────────
-var pwVisible = false;
+let pwVisible = false;
 
 function toggleEye() {
   pwVisible = !pwVisible;
-  var inp = G('ipass');
+  const inp = G('ipass');
   inp.type = pwVisible ? 'text' : 'password';
   G('eyebtn').textContent = pwVisible ? '\u{1F648}' : '\u{1F441}';
   inp.focus();
-  try { var l = inp.value.length; inp.setSelectionRange(l, l); } catch(e) {}
+  try { const l = inp.value.length; inp.setSelectionRange(l, l); } catch(e) {}
 }
 
 function onPW(pw) {
-  var s = 0;
+  let s = 0;
   if (pw.length >= 6) s++;
   if (pw.length >= 12) s++;
   if (/[A-Za-z]/.test(pw) && /[0-9]/.test(pw)) s++;
   if (/[^A-Za-z0-9]/.test(pw)) s++;
-  var cols = ['','sr','sr','so','sg'];
-  var lbls = ['','Weak','Weak','Fair \u2014 add a symbol','Strong \u2736'];
-  var clrs = ['','var(--red)','var(--red)','var(--amber)','var(--green)'];
-  for (var i = 1; i <= 4; i++) {
+  const cols = ['','sr','sr','so','sg'];
+  const lbls = ['','Weak','Weak','Fair \u2014 add a symbol','Strong \u2736'];
+  const clrs = ['','var(--red)','var(--red)','var(--amber)','var(--green)'];
+  for (let i = 1; i <= 4; i++) {
     G('s'+i).className = 'sb' + (i <= s ? ' ' + cols[s] : '');
   }
-  var h = G('shint');
+  const h = G('shint');
   h.textContent = pw.length ? (lbls[s] || '') : '';
-  h.style.color = clrs[s] || 'var(--sub)';
+  h.style.color  = clrs[s] || 'var(--sub)';
 }
 
 // ── STATE ────────────────────────────────────────
-var pc = null, dc = null, vs = null;
-var room = '', myName = '', peerName = '';
-var isHost = false, locked = false;
-var camOn = false, micOn = false;
-var wipeTimer = null, iceQueue = [];
+let pc = null, dc = null, vs = null;
+let room = '', myName = '', peerName = '';
+let isHost = false, locked = false;
+let camOn = false, micOn = false;
+let wipeTimer = null, iceQueue = [];
 
 // ── VALIDATE ─────────────────────────────────────
 async function validate() {
   myName = G('iname').value.trim();
-  var pw = G('ipass').value;
-  if (!myName) { toast('Enter your name'); return false; }
-  if (!pw) { toast('Enter a passphrase'); return false; }
+  const pw = G('ipass').value;
+  if (!myName)    { toast('Enter your name'); return false; }
+  if (!pw)        { toast('Enter a passphrase'); return false; }
   if (pw.length < 4) { toast('Passphrase too short'); return false; }
-  if (CF === 'PASTE_YOUR_WORKER_URL_HERE') { toast('\u26A0\uFE0F Add your Cloudflare Worker URL in the code first'); return false; }
+  if (CF === 'PASTE_YOUR_WORKER_URL_HERE') { toast('\u26A0\uFE0F Paste your Cloudflare Worker URL in the code first'); return false; }
   lockBtns(true);
   try { PH = await deriveKey(pw); }
   catch(e) { toast('Key error \u2014 try again'); lockBtns(false); return false; }
@@ -524,12 +527,12 @@ async function validate() {
 
 function lockBtns(on) {
   G('bcreate').disabled = on;
-  G('bjoin').disabled = on;
+  G('bjoin').disabled   = on;
 }
 
 function mkCode() {
-  var C = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from(nacl.randomBytes(6), function(b) { return C[b % C.length]; }).join('');
+  const C = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from(nacl.randomBytes(6), b => C[b % C.length]).join('');
 }
 
 // ── NAVIGATION ───────────────────────────────────
@@ -553,22 +556,22 @@ function goBack() {
 }
 
 function showCard(id) {
-  ['cm','cc','cj'].forEach(function(c) {
-    G(c).style.display = c === id ? '' : 'none';
-  });
+  ['cm','cc','cj'].forEach(c => G(c).style.display = c === id ? '' : 'none');
 }
 
 function copyCode() {
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(room).then(function() { toast('Code copied \u2736'); }).catch(function() { toast('Code: ' + room); });
+    navigator.clipboard.writeText(room)
+      .then(() => toast('Code copied \u2736'))
+      .catch(() => toast('Code: ' + room));
   } else { toast('Code: ' + room); }
 }
 
-// ── HOST FLOW ─────────────────────────────────────
+// ── HOST FLOW ────────────────────────────────────
 async function hostFlow() {
   hStep(1, 'sa');
   try {
-    await cfWrite(room, 'offer', null);
+    await cfWrite(room, 'offer',  null);
     await cfWrite(room, 'answer', null);
     await cfWrite(room, 'locked', false);
 
@@ -576,35 +579,29 @@ async function hostFlow() {
     dc = pc.createDataChannel('ou', {ordered: true});
     wireChannel(dc);
 
-    var iceBuf = [];
-    pc.onicecandidate = function(e) { if (e.candidate) iceBuf.push(e.candidate.toJSON()); };
-    pc.onicegatheringstatechange = async function() {
-      if (pc.iceGatheringState === 'complete' && iceBuf.length) {
+    let iceBuf = [];
+    pc.onicecandidate = e => { if (e.candidate) iceBuf.push(e.candidate.toJSON()); };
+    pc.onicegatheringstatechange = async () => {
+      if (pc.iceGatheringState === 'complete' && iceBuf.length)
         await cfWrite(room, 'hice', iceBuf);
-      }
     };
     setupIceHandler();
-    pc.ontrack = function(e) { if (e.streams && e.streams[0]) setRemoteVid(e.streams[0]); };
+    pc.ontrack = e => { if (e.streams && e.streams[0]) setRemoteVid(e.streams[0]); };
 
-    var offer = await pc.createOffer();
+    const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     await cfWrite(room, 'offer', {sdp: offer.sdp, type: offer.type, ts: Date.now()});
     hStep(2, 'sa');
 
-    var ans = await cfPoll(room, 'answer', 120000, 1500);
+    const ans = await cfPoll(room, 'answer', 120000, 1500);
     if (!ans) { hStep(2, 'se'); toast('No one joined \u2014 timed out'); return; }
 
     hStep(3, 'sa');
     await pc.setRemoteDescription(new RTCSessionDescription(ans));
 
-    var jice = await cfPoll(room, 'jice', 15000, 1000);
-    var candidates = jice || [];
-    for (var i = 0; i < candidates.length; i++) {
-      await pc.addIceCandidate(new RTCIceCandidate(candidates[i])).catch(function(){});
-    }
-    for (var i = 0; i < iceQueue.length; i++) {
-      await pc.addIceCandidate(new RTCIceCandidate(iceQueue[i])).catch(function(){});
-    }
+    const jice = await cfPoll(room, 'jice', 15000, 1000);
+    for (const c of (jice || []))  await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+    for (const c of iceQueue)       await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
     iceQueue = [];
     locked = true;
     await cfWrite(room, 'locked', true);
@@ -614,9 +611,9 @@ async function hostFlow() {
   }
 }
 
-// ── JOIN FLOW ─────────────────────────────────────
+// ── JOIN FLOW ────────────────────────────────────
 function doJoin() {
-  var code = G('icode').value.trim().toUpperCase();
+  const code = G('icode').value.trim().toUpperCase();
   if (code.length < 4) { toast('Enter the room code'); return; }
   room = code; newKP();
   G('jsteps').style.display = 'flex';
@@ -627,36 +624,32 @@ function doJoin() {
 
 async function joinFlow() {
   try {
-    var lk = await cfRead(room, 'locked');
+    const lk = await cfRead(room, 'locked');
     if (lk === true) { toast('Room is full \u2014 max 2 users'); jStep(2,'se'); G('bconn').disabled=false; return; }
 
     jStep(2, 'sa');
-    var offer = await cfPoll(room, 'offer', 30000, 1200);
+    const offer = await cfPoll(room, 'offer', 30000, 1200);
     if (!offer || !offer.sdp) { toast('Room not found \u2014 check code'); jStep(2,'se'); G('bconn').disabled=false; return; }
     if (Date.now() - offer.ts > 900000) { toast('Room expired'); jStep(2,'se'); G('bconn').disabled=false; return; }
 
     jStep(3, 'sa');
     pc = new RTCPeerConnection(ICE_CFG);
-    pc.ondatachannel = function(e) { dc = e.channel; wireChannel(dc); };
+    pc.ondatachannel = e => { dc = e.channel; wireChannel(dc); };
 
-    var iceBuf = [];
-    pc.onicecandidate = function(e) { if (e.candidate) iceBuf.push(e.candidate.toJSON()); };
-    pc.onicegatheringstatechange = async function() {
-      if (pc.iceGatheringState === 'complete' && iceBuf.length) {
+    let iceBuf = [];
+    pc.onicecandidate = e => { if (e.candidate) iceBuf.push(e.candidate.toJSON()); };
+    pc.onicegatheringstatechange = async () => {
+      if (pc.iceGatheringState === 'complete' && iceBuf.length)
         await cfWrite(room, 'jice', iceBuf);
-      }
     };
     setupIceHandler();
-    pc.ontrack = function(e) { if (e.streams && e.streams[0]) setRemoteVid(e.streams[0]); };
+    pc.ontrack = e => { if (e.streams && e.streams[0]) setRemoteVid(e.streams[0]); };
 
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    var hice = await cfPoll(room, 'hice', 15000, 1000);
-    var hcandidates = hice || [];
-    for (var i = 0; i < hcandidates.length; i++) {
-      await pc.addIceCandidate(new RTCIceCandidate(hcandidates[i])).catch(function(){});
-    }
+    const hice = await cfPoll(room, 'hice', 15000, 1000);
+    for (const c of (hice || [])) await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
 
-    var answer = await pc.createAnswer();
+    const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     await cfWrite(room, 'answer', {sdp: answer.sdp, type: answer.type});
     jStep(3, 'sd'); jStep(4, 'sa');
@@ -668,22 +661,22 @@ async function joinFlow() {
 
 function setupIceHandler() {
   if (!pc) return;
-  pc.oniceconnectionstatechange = function() {
-    var s = pc.iceConnectionState;
+  pc.oniceconnectionstatechange = () => {
+    const s = pc.iceConnectionState;
     if (s === 'connected' || s === 'completed') setCS('g', 'encrypted \u00B7 P2P connected');
     if (s === 'failed' && pc.restartIce) pc.restartIce();
   };
 }
 
-// ── DATA CHANNEL ──────────────────────────────────
+// ── DATA CHANNEL ─────────────────────────────────
 function wireChannel(ch) {
-  ch.onopen = function() {
+  ch.onopen = () => {
     setCS('y', 'exchanging keys\u2026');
     dcSend({t:'KEY', k:nacl.util.encodeBase64(KP.publicKey), n:myName});
   };
 
-  ch.onmessage = function(ev) {
-    var d;
+  ch.onmessage = ev => {
+    let d;
     try { d = JSON.parse(ev.data); } catch(e) { return; }
     if (!d || !d.t) return;
 
@@ -695,7 +688,7 @@ function wireChannel(ch) {
     }
 
     if (d.t === 'VRF') {
-      var check = SK ? decT(d.d) : null;
+      const check = SK ? decT(d.d) : null;
       if (check === 'onlyus-ok') {
         cancelWipe(); openChat();
         setCS('g', 'encrypted \u00B7 connected');
@@ -718,20 +711,20 @@ function wireChannel(ch) {
     if (d.t === 'RNO') { toast('Reconnect declined'); return; }
 
     if (d.t === 'MSG') {
-      var txt = decT(d.d);
+      const txt = decT(d.d);
       if (txt !== null) addMsg(txt, 'them');
       else addSys('\u26A0\uFE0F Message could not be decrypted');
       return;
     }
 
     if (d.t === 'IMG') {
-      var bytes = decB(d.d);
+      const bytes = decB(d.d);
       if (bytes) addImgMsg(URL.createObjectURL(new Blob([bytes], {type: d.m || 'image/jpeg'})), 'them');
       else addSys('\u26A0\uFE0F Photo could not be decrypted');
     }
   };
 
-  ch.onclose = function() {
+  ch.onclose = () => {
     setCS('r', 'disconnected');
     addSys(peerName + ' left the room');
     SK = null; locked = false;
@@ -739,16 +732,16 @@ function wireChannel(ch) {
     scheduleWipe();
   };
 
-  ch.onerror = function() { setCS('r', 'error'); toast('Connection error'); };
+  ch.onerror = () => { setCS('r', 'error'); toast('Connection error'); };
 }
 
 function dcSend(obj) {
   if (dc && dc.readyState === 'open') dc.send(JSON.stringify(obj));
 }
 
-// ── SEND ──────────────────────────────────────────
+// ── SEND ─────────────────────────────────────────
 function sendMsg() {
-  var el = G('mi'), txt = el.value.trim();
+  const el = G('mi'), txt = el.value.trim();
   if (!txt) return;
   if (!isReady()) { toast('Not connected yet'); return; }
   dcSend({t:'MSG', d:encT(txt)});
@@ -757,13 +750,13 @@ function sendMsg() {
 }
 
 function onFile(e) {
-  var f = e.target.files[0];
+  const f = e.target.files[0];
   if (!f) return;
   if (!isReady()) { toast('Not connected yet'); return; }
   if (f.size > 8388608) { toast('Max 8MB'); return; }
-  var reader = new FileReader();
-  reader.onload = function(ev) {
-    var bytes = new Uint8Array(ev.target.result);
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const bytes = new Uint8Array(ev.target.result);
     dcSend({t:'IMG', d:encB(bytes), m:f.type});
     addImgMsg(URL.createObjectURL(f), 'me');
     toast('Photo sent \u2736');
@@ -774,7 +767,7 @@ function onFile(e) {
 
 function isReady() { return dc && dc.readyState === 'open' && !!SK; }
 
-// ── VIDEO ─────────────────────────────────────────
+// ── VIDEO ────────────────────────────────────────
 async function toggleCam() {
   if (!camOn) {
     try {
@@ -785,15 +778,14 @@ async function toggleCam() {
       G('vph').style.display = 'none';
       G('bcam').classList.add('on');
       G('bmic').classList.add('on');
-      if (pc && pc.signalingState !== 'closed') {
-        vs.getTracks().forEach(function(t) { pc.addTrack(t, vs); });
-      }
+      if (pc && pc.signalingState !== 'closed')
+        vs.getTracks().forEach(t => pc.addTrack(t, vs));
       toast('Video on \u00B7 DTLS-SRTP');
       wakeLock();
     } catch(e) { toast('Camera denied \u2014 allow in browser settings'); }
   } else {
     camOn = !camOn;
-    if (vs) vs.getVideoTracks().forEach(function(t) { t.enabled = camOn; });
+    vs?.getVideoTracks().forEach(t => t.enabled = camOn);
     G('bcam').classList.toggle('on', camOn);
     toast(camOn ? 'Camera on' : 'Camera off');
   }
@@ -802,7 +794,7 @@ async function toggleCam() {
 function toggleMic() {
   if (!vs) { toast('Start camera first'); return; }
   micOn = !micOn;
-  vs.getAudioTracks().forEach(function(t) { t.enabled = micOn; });
+  vs.getAudioTracks().forEach(t => t.enabled = micOn);
   G('bmic').classList.toggle('on', micOn);
   toast(micOn ? 'Mic on' : 'Mic muted \u{1F507}');
 }
@@ -825,7 +817,7 @@ function acceptR() { dcSend({t:'ROK', n:myName}); closeR(); toast('Accepted \u27
 // ── KEY WIPE ─────────────────────────────────────
 function scheduleWipe() {
   clearTimeout(wipeTimer);
-  wipeTimer = setTimeout(function() {
+  wipeTimer = setTimeout(() => {
     fullWipe();
     addSys('\u26A0\uFE0F Session expired \u2014 all keys wiped. Refresh to start again.');
     setCS('r', 'keys wiped');
@@ -842,13 +834,13 @@ function fullWipe() {
   room = ''; peerName = ''; locked = false; iceQueue = [];
   G('ml').innerHTML = '';
   G('bw').classList.remove('on');
-  if (vs) { vs.getTracks().forEach(function(t) { t.stop(); }); vs = null; }
+  vs?.getTracks().forEach(t => t.stop()); vs = null;
   camOn = false; micOn = false;
   G('vw').classList.remove('on');
   G('bcam').classList.remove('on');
   G('bmic').classList.remove('on');
-  try { if (dc) dc.close(); } catch(e) {} dc = null;
-  try { if (pc) pc.close(); } catch(e) {} pc = null;
+  try { dc?.close(); } catch(e) {} dc = null;
+  try { pc?.close(); } catch(e) {} pc = null;
 }
 
 function endSess() {
@@ -857,12 +849,12 @@ function endSess() {
 }
 
 function cleanup() {
-  try { if (dc) dc.close(); } catch(e) {} dc = null;
-  try { if (pc) pc.close(); } catch(e) {} pc = null;
+  try { dc?.close(); } catch(e) {} dc = null;
+  try { pc?.close(); } catch(e) {} pc = null;
   iceQueue = []; locked = false;
 }
 
-// ── CHAT UI ───────────────────────────────────────
+// ── CHAT UI ──────────────────────────────────────
 function openChat() {
   G('setup').classList.remove('on');
   G('chat').classList.add('on');
@@ -871,103 +863,103 @@ function openChat() {
 }
 
 function addMsg(txt, who) {
-  var w = mk('div', 'mw ' + who);
-  w.innerHTML = '<div class="bub">' + esc(txt) + '</div><div class="mt">' + nowTime() + '</div><div class="menc">\u2B21 encrypted</div>';
+  const w = mk('div', 'mw ' + who);
+  w.innerHTML = '<div class="bub">' + esc(txt) + '</div>'
+    + '<div class="mt">' + nowTime() + '</div>'
+    + '<div class="menc">\u2B21 encrypted</div>';
   G('ml').appendChild(w);
   scrollBottom();
 }
 
 function addImgMsg(url, who) {
-  var w = mk('div', 'mw ' + who);
-  var b = mk('div', 'bub');
-  b.style.padding = '4px';
-  var img = mk('img');
+  const w   = mk('div', 'mw ' + who);
+  const b   = mk('div', 'bub'); b.style.padding = '4px';
+  const img = mk('img');
   img.src = url; img.loading = 'lazy';
-  img.onclick = function() { openLB(url); };
-  b.appendChild(img);
-  w.appendChild(b);
-  var meta = mk('div','mt'); meta.textContent = nowTime();
-  var enc = mk('div','menc'); enc.textContent = '\u2B21 photo encrypted';
+  img.onclick = () => openLB(url);
+  b.appendChild(img); w.appendChild(b);
+  const meta = mk('div','mt'); meta.textContent = nowTime();
+  const enc  = mk('div','menc'); enc.textContent = '\u2B21 photo encrypted';
   w.appendChild(meta); w.appendChild(enc);
   G('ml').appendChild(w);
   scrollBottom();
 }
 
 function addSys(txt) {
-  var d = mk('div', 'sys');
+  const d = mk('div', 'sys');
   d.textContent = txt;
   G('ml').appendChild(d);
   scrollBottom();
 }
 
 function scrollBottom() {
-  var m = G('ml');
-  setTimeout(function() { m.scrollTop = m.scrollHeight; }, 50);
+  const m = G('ml');
+  setTimeout(() => m.scrollTop = m.scrollHeight, 50);
 }
 
 function setCS(color, text) {
-  var d = G('cdot');
-  d.className = 'dot ' + (color === 'g' ? 'dg' : color === 'r' ? 'dr' : 'dy');
+  G('cdot').className = 'dot ' + (color === 'g' ? 'dg' : color === 'r' ? 'dr' : 'dy');
   G('clbl').textContent = text;
 }
 
 function hStep(n, c) {
-  for (var i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 4; i++)
     G('hs'+i).className = 'step' + (i === n ? ' '+c : i < n ? ' sd' : '');
-  }
 }
 
 function jStep(n, c) {
-  for (var i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 4; i++)
     G('js'+i).className = 'step' + (i === n ? ' '+c : i < n ? ' sd' : '');
-  }
 }
 
-function onKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }
-function grow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px'; }
+function onKey(e)  { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }
+function grow(el)  { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px'; }
 
 // ── MODALS ────────────────────────────────────────
-function showInfo() { G('infov').classList.add('on'); }
+function showInfo()  { G('infov').classList.add('on'); }
 function closeInfo() { G('infov').classList.remove('on'); }
-function closeWP() { G('wpov').classList.remove('on'); location.reload(); }
+function closeWP()   { G('wpov').classList.remove('on'); location.reload(); }
 function openLB(url) { G('lbi').src = url; G('lb').classList.add('on'); }
-function closeLB() { G('lb').classList.remove('on'); }
+function closeLB()   { G('lb').classList.remove('on'); }
 
 // ── TOAST ─────────────────────────────────────────
-var toastTimer2 = null;
+let toastTimer = null;  // FIX: was "toastTimer2"
 function toast(msg) {
-  var t = G('toast');
+  const t = G('toast');
   t.textContent = msg;
   t.classList.add('on');
-  clearTimeout(toastTimer2);
-  toastTimer2 = setTimeout(function() { t.classList.remove('on'); }, 3000);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 3000);
 }
 
 // ── ANTI-SCREENSHOT ───────────────────────────────
-var scTimer = null;
+let scTimer = null;
 function showSC() {
   G('scb').classList.add('on');
   clearTimeout(scTimer);
-  scTimer = setTimeout(function() { G('scb').classList.remove('on'); }, 3000);
+  scTimer = setTimeout(() => G('scb').classList.remove('on'), 3000);
 }
 
-document.addEventListener('visibilitychange', function() {
-  document.body.classList.toggle('blur-ss', document.hidden);
+// FIX: merged both visibilitychange listeners into one
+document.addEventListener('visibilitychange', () => {
+  const hidden = document.hidden;
+  document.body.classList.toggle('blur-ss', hidden);
+  if (!hidden && camOn) wakeLock(); // wake lock refresh on return
 });
 
-document.addEventListener('keydown', function(e) {
-  var isScreenshot = e.key === 'PrintScreen' || (e.metaKey && e.shiftKey && ['3','4','5'].indexOf(e.key) !== -1);
-  if (isScreenshot) { e.preventDefault(); showSC(); toast('\u{1F4F5} Screenshot blocked'); }
+document.addEventListener('keydown', e => {
+  const ss = e.key === 'PrintScreen' || (e.metaKey && e.shiftKey && ['3','4','5'].indexOf(e.key) !== -1);
+  if (ss) { e.preventDefault(); showSC(); toast('\u{1F4F5} Screenshot blocked'); }
 });
 
 if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-  navigator.mediaDevices.getDisplayMedia = async function() {
+  navigator.mediaDevices.getDisplayMedia = async () => {
     showSC(); toast('\u{1F4F5} Screen recording blocked');
     throw new DOMException('Blocked', 'NotAllowedError');
   };
 }
 
-document.addEventListener('contextmenu', function(e) {
+document.addEventListener('contextmenu', e => {
   if (G('chat').classList.contains('on')) e.preventDefault();
 });
 
@@ -975,24 +967,21 @@ document.addEventListener('contextmenu', function(e) {
 async function wakeLock() {
   try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch(e) {}
 }
-document.addEventListener('visibilitychange', function() {
-  if (document.visibilityState === 'visible' && camOn) wakeLock();
-});
 
 // ── UTILS ─────────────────────────────────────────
-function G(id) { return document.getElementById(id); }
-function mk(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
-function nowTime() { return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
-function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
-function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+function G(id)      { return document.getElementById(id); }
+function mk(tag, c) { const e = document.createElement(tag); if (c) e.className = c; return e; }
+function nowTime()  { return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+function sleep(ms)  { return new Promise(r => setTimeout(r, ms)); }
+function esc(t)     { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 
-// Back button (Android)
+// ── ANDROID BACK BUTTON ───────────────────────────
 history.pushState({}, '');
-window.addEventListener('popstate', function() {
-  if (G('lb').classList.contains('on')) { closeLB(); return; }
-  if (G('infov').classList.contains('on')) { closeInfo(); return; }
-  if (G('wpov').classList.contains('on')) { return; }
-  if (G('rp').classList.contains('on')) { closeR(); return; }
+window.addEventListener('popstate', () => {
+  if (G('lb').classList.contains('on'))    { closeLB();    return; }
+  if (G('infov').classList.contains('on')) { closeInfo();  return; }
+  if (G('wpov').classList.contains('on'))  { return; }
+  if (G('rp').classList.contains('on'))    { closeR();     return; }
   history.pushState({}, '');
 });
 </script>
