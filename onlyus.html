@@ -579,11 +579,17 @@ async function hostFlow() {
     dc = pc.createDataChannel('ou', {ordered: true});
     wireChannel(dc);
 
-    let iceBuf = [];
-    pc.onicecandidate = e => { if (e.candidate) iceBuf.push(e.candidate.toJSON()); };
-    pc.onicegatheringstatechange = async () => {
-      if (pc.iceGatheringState === 'complete' && iceBuf.length)
-        await cfWrite(room, 'hice', iceBuf);
+    // Trickle ICE — send each candidate immediately as it arrives
+    let hiceArr = [];
+    let hiceTimer = null;
+    pc.onicecandidate = e => {
+      if (e.candidate) {
+        hiceArr.push(e.candidate.toJSON());
+        clearTimeout(hiceTimer);
+        hiceTimer = setTimeout(async () => {
+          await cfWrite(room, 'hice', hiceArr);
+        }, 300);
+      }
     };
     setupIceHandler();
     pc.ontrack = e => { if (e.streams && e.streams[0]) setRemoteVid(e.streams[0]); };
@@ -593,15 +599,15 @@ async function hostFlow() {
     await cfWrite(room, 'offer', {sdp: offer.sdp, type: offer.type, ts: Date.now()});
     hStep(2, 'sa');
 
-    const ans = await cfPoll(room, 'answer', 120000, 1500);
+    const ans = await cfPoll(room, 'answer', 120000, 800);
     if (!ans) { hStep(2, 'se'); toast('No one joined \u2014 timed out'); return; }
 
     hStep(3, 'sa');
     await pc.setRemoteDescription(new RTCSessionDescription(ans));
 
-    const jice = await cfPoll(room, 'jice', 15000, 1000);
+    // Poll for joiner ICE — apply as they arrive
+    const jice = await cfPoll(room, 'jice', 15000, 500);
     for (const c of (jice || []))  await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
-    for (const c of iceQueue)       await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
     iceQueue = [];
     locked = true;
     await cfWrite(room, 'locked', true);
@@ -628,7 +634,7 @@ async function joinFlow() {
     if (lk === true) { toast('Room is full \u2014 max 2 users'); jStep(2,'se'); G('bconn').disabled=false; return; }
 
     jStep(2, 'sa');
-    const offer = await cfPoll(room, 'offer', 30000, 1200);
+    const offer = await cfPoll(room, 'offer', 30000, 600);
     if (!offer || !offer.sdp) { toast('Room not found \u2014 check code'); jStep(2,'se'); G('bconn').disabled=false; return; }
     if (Date.now() - offer.ts > 900000) { toast('Room expired'); jStep(2,'se'); G('bconn').disabled=false; return; }
 
@@ -636,17 +642,23 @@ async function joinFlow() {
     pc = new RTCPeerConnection(ICE_CFG);
     pc.ondatachannel = e => { dc = e.channel; wireChannel(dc); };
 
-    let iceBuf = [];
-    pc.onicecandidate = e => { if (e.candidate) iceBuf.push(e.candidate.toJSON()); };
-    pc.onicegatheringstatechange = async () => {
-      if (pc.iceGatheringState === 'complete' && iceBuf.length)
-        await cfWrite(room, 'jice', iceBuf);
+    // Trickle ICE — send each candidate immediately as it arrives
+    let jiceArr = [];
+    let jiceTimer = null;
+    pc.onicecandidate = e => {
+      if (e.candidate) {
+        jiceArr.push(e.candidate.toJSON());
+        clearTimeout(jiceTimer);
+        jiceTimer = setTimeout(async () => {
+          await cfWrite(room, 'jice', jiceArr);
+        }, 300);
+      }
     };
     setupIceHandler();
     pc.ontrack = e => { if (e.streams && e.streams[0]) setRemoteVid(e.streams[0]); };
 
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    const hice = await cfPoll(room, 'hice', 15000, 1000);
+    const hice = await cfPoll(room, 'hice', 15000, 500);
     for (const c of (hice || [])) await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
 
     const answer = await pc.createAnswer();
