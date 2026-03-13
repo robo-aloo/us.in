@@ -89,8 +89,18 @@ body.blur-ss #app{filter:blur(20px)}
 
 /* CHAT */
 #chat{height:100%}
-@media(orientation:landscape) and (min-width:640px){#chat.on{flex-direction:row}#vc{width:40%;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--bdr)}#mc{flex:1;display:flex;flex-direction:column;min-width:0}#vw.on{flex:1}}
-@media not ((orientation:landscape) and (min-width:640px)){#vc{flex-shrink:0}#mc{flex:1;display:flex;flex-direction:column;min-width:0}}
+@media(orientation:landscape) and (min-width:640px){
+  #chat.on{flex-direction:row}
+  #vc{width:42%;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--bdr)}
+  #mc{flex:1;display:flex;flex-direction:column;min-width:0}
+  #vw.on{flex:1}
+}
+@media(orientation:portrait){
+  #chat.on{flex-direction:column}
+  #vc{flex-shrink:0}
+  #mc{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  #vw.on{height:clamp(160px,40vw,240px)}
+}
 
 /* TOPBAR */
 #topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top));background:var(--card);border-bottom:1px solid var(--bdr);flex-shrink:0}
@@ -103,24 +113,33 @@ body.blur-ss #app{filter:blur(20px)}
 .dr{background:var(--red)}
 @keyframes dp{0%,100%{opacity:1}50%{opacity:.2}}
 .ta{display:flex;gap:6px;align-items:center;flex-shrink:0}
-.ic{width:36px;height:36px;border-radius:50%;background:var(--inp);border:1.5px solid var(--bdr);color:var(--sub);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;outline:none;flex-shrink:0}
+.ic{width:36px;height:36px;border-radius:50%;background:var(--inp);border:1.5px solid var(--bdr);color:var(--sub);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;outline:none;flex-shrink:0;position:relative}
 .ic:hover,.ic.on{background:rgba(130,110,255,.15);border-color:var(--p);color:var(--p)}
 .ic-r{background:rgba(255,107,107,.07);border-color:rgba(255,107,107,.2);color:var(--red)}
 .ic-r:hover{background:rgba(255,107,107,.18)}
 .ic-a{background:rgba(245,166,35,.07);border-color:rgba(245,166,35,.2);color:var(--amber)}
+.ic svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+/* Slash line for off state */
+.ic .slash{position:absolute;width:1.5px;height:24px;background:currentColor;border-radius:2px;transform:rotate(45deg);pointer-events:none;display:none}
+.ic.off .slash{display:block}
+.ic.off{color:var(--red);border-color:rgba(255,107,107,.3);background:rgba(255,107,107,.07)}
 #bw{position:relative;display:none}
 #bw.on{display:block}
 .ring{position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--amber);pointer-events:none;animation:rp 1.8s infinite}
 @keyframes rp{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.8)}}
 
 /* VIDEO */
-#vw{position:relative;background:#000;display:none;overflow:hidden}
+#vw{position:relative;background:var(--card);display:none;overflow:hidden}
 #vw.on{display:block}
-@media(orientation:portrait){#vw.on{height:clamp(140px,33vmin,200px)}}
 #rv{width:100%;height:100%;object-fit:cover;display:block}
-#lv{position:absolute;bottom:8px;right:8px;width:68px;height:92px;object-fit:cover;border-radius:8px;border:2px solid rgba(130,110,255,.5);box-shadow:0 2px 12px rgba(0,0,0,.5)}
-.vph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:var(--sub);font-size:11px}
-.vphi{font-size:28px;opacity:.1}
+#lv{position:absolute;bottom:10px;right:10px;width:72px;height:96px;object-fit:cover;border-radius:10px;border:2px solid rgba(130,110,255,.5);box-shadow:0 2px 16px rgba(0,0,0,.6)}
+/* Video placeholder — nice avatar when cam off */
+.vph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:var(--card)}
+.vph-ring{width:72px;height:72px;border-radius:50%;background:var(--inp);border:2px solid var(--bdr);display:flex;align-items:center;justify-content:center}
+.vph-ring svg{opacity:.2;width:32px;height:32px;fill:none;stroke:var(--txt);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.vph-lbl{font-size:12px;color:var(--sub);letter-spacing:.5px}
+.vph-tag{font-size:9px;color:var(--sub);opacity:.4;letter-spacing:2px;text-transform:uppercase}
+
 
 /* MESSAGES */
 #ml{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
@@ -133,6 +152,9 @@ body.blur-ss #app{filter:blur(20px)}
 .mw.me .bub{background:var(--me);border-bottom-right-radius:3px}
 .mw.them .bub{background:var(--them);border:1px solid var(--bdr);border-bottom-left-radius:3px}
 .bub img{max-width:170px;max-height:190px;border-radius:8px;display:block;cursor:pointer}
+.mname{font-size:11px;font-weight:600;margin-bottom:3px;padding-left:2px;letter-spacing:.3px}
+.mw.me .mname{color:var(--p2);text-align:right;padding-right:2px}
+.mw.them .mname{color:var(--p)}
 .mt{font-size:10px;color:var(--sub);margin-top:3px}
 .menc{font-size:10px;color:var(--green);opacity:.3}
 .sys{align-self:center;font-size:11px;color:var(--sub);padding:4px 12px;background:var(--inp);border-radius:20px;border:1px solid var(--bdr);text-align:center;max-width:90%}
@@ -285,15 +307,33 @@ body.blur-ss #app{filter:blur(20px)}
         <div class="ts"><span class="dot dy" id="cdot"></span><span id="clbl">connecting&hellip;</span></div>
       </div>
       <div class="ta">
-        <div id="bw"><div class="ring"></div><button class="ic ic-a" type="button" onclick="onBell()">&#x1F514;</button></div>
-        <button class="ic" id="bcam" type="button" onclick="toggleCam()">&#x1F4F7;</button>
-        <button class="ic" id="bmic" type="button" onclick="toggleMic()">&#x1F399;</button>
-        <button class="ic"           type="button" onclick="showInfo()">&#x1F512;</button>
-        <button class="ic ic-r"      type="button" onclick="endSess()">&#x2715;</button>
+        <div id="bw"><div class="ring"></div><button class="ic ic-a" type="button" onclick="onBell()">
+          <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button></div>
+        <button class="ic" id="bcam" type="button" onclick="toggleCam()">
+          <svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+          <span class="slash"></span>
+        </button>
+        <button class="ic" id="bmic" type="button" onclick="toggleMic()">
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          <span class="slash"></span>
+        </button>
+        <button class="ic" type="button" onclick="showInfo()">
+          <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </button>
+        <button class="ic ic-r" type="button" onclick="endSess()">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
     </div>
     <div id="vw">
-      <div class="vph" id="vph"><div class="vphi">&#x1F4F7;</div><div>tap camera to start</div></div>
+      <div class="vph" id="vph">
+        <div class="vph-ring">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        </div>
+        <div class="vph-lbl" id="vphlbl">Camera off</div>
+        <div class="vph-tag">tap 📷 to start video</div>
+      </div>
       <video id="rv" autoplay playsinline></video>
       <video id="lv" autoplay playsinline muted></video>
     </div>
@@ -828,12 +868,10 @@ async function toggleCam() {
       camOn = true; micOn = true;
       G('vw').classList.add('on');
       G('vph').style.display = 'none';
-      G('bcam').classList.add('on');
-      G('bmic').classList.add('on');
-      // Add tracks then renegotiate via datachannel
+      G('bcam').classList.remove('off'); G('bcam').classList.add('on');
+      G('bmic').classList.remove('off'); G('bmic').classList.add('on');
       if (pc && pc.signalingState !== 'closed') {
         vs.getTracks().forEach(t => pc.addTrack(t, vs));
-        // Manual renegotiation over encrypted datachannel
         pc.onnegotiationneeded = async () => {
           try {
             const offer = await pc.createOffer();
@@ -850,6 +888,14 @@ async function toggleCam() {
     camOn = !camOn;
     vs?.getVideoTracks().forEach(t => t.enabled = camOn);
     G('bcam').classList.toggle('on', camOn);
+    G('bcam').classList.toggle('off', !camOn);
+    if (!camOn) {
+      // show placeholder when cam off
+      G('vph').style.display = '';
+      G('vphlbl').textContent = 'Camera paused';
+    } else {
+      G('vph').style.display = 'none';
+    }
     toast(camOn ? 'Camera on' : 'Camera off');
   }
 }
@@ -859,28 +905,37 @@ function toggleMic() {
   micOn = !micOn;
   vs.getAudioTracks().forEach(t => t.enabled = micOn);
   G('bmic').classList.toggle('on', micOn);
-  toast(micOn ? 'Mic on' : 'Mic muted \u{1F507}');
+  G('bmic').classList.toggle('off', !micOn);
+  toast(micOn ? 'Mic on' : 'Mic muted');
 }
 
 function setRemoteVid(stream) {
   G('rv').srcObject = stream;
   G('vw').classList.add('on');
-  G('vph').style.display = 'none';
+  // Show placeholder with peer name, hide when tracks active
+  const vph = G('vph');
+  const checkTracks = () => {
+    const active = stream.getVideoTracks().some(t => t.enabled && t.readyState === 'live');
+    vph.style.display = active ? 'none' : '';
+    if (!active) G('vphlbl').textContent = (peerName || 'Them') + '\'s camera is off';
+  };
+  stream.getVideoTracks().forEach(t => { t.onended = checkTracks; t.onmute = checkTracks; t.onunmute = checkTracks; });
+  checkTracks();
 }
 
 // ── RECONNECT ────────────────────────────────────
 function onBell() {
   if (isReady()) {
-    // Connected — send reconnect request to other side
     dcSend({t:'RRQ', n:myName});
     toast('Reconnect request sent');
   } else {
-    // DC is closed — restart full flow
     cleanup();
+    locked = false; // clear lock so joiner can re-enter
     toast('Reconnecting\u2026');
     if (isHost) {
       newKP();
-      hostFlow();
+      // Reset locked on server too
+      cfWrite(room, 'locked', false).then(() => hostFlow());
     } else {
       newKP();
       joinFlow();
@@ -914,8 +969,8 @@ function fullWipe() {
   vs?.getTracks().forEach(t => t.stop()); vs = null;
   camOn = false; micOn = false;
   G('vw').classList.remove('on');
-  G('bcam').classList.remove('on');
-  G('bmic').classList.remove('on');
+  G('bcam').classList.remove('on','off');
+  G('bmic').classList.remove('on','off');
   try { dc?.close(); } catch(e) {} dc = null;
   try { pc?.close(); } catch(e) {} pc = null;
 }
@@ -941,7 +996,10 @@ function openChat() {
 
 function addMsg(txt, who) {
   const w = mk('div', 'mw ' + who);
-  w.innerHTML = '<div class="bub">' + esc(txt) + '</div>'
+  const nm = mk('div','mname');
+  nm.textContent = who === 'me' ? (myName || 'You') : (peerName || 'Them');
+  w.appendChild(nm);
+  w.innerHTML += '<div class="bub">' + esc(txt) + '</div>'
     + '<div class="mt">' + nowTime() + '</div>'
     + '<div class="menc">\u2B21 encrypted</div>';
   G('ml').appendChild(w);
@@ -950,6 +1008,9 @@ function addMsg(txt, who) {
 
 function addImgMsg(url, who) {
   const w   = mk('div', 'mw ' + who);
+  const nm  = mk('div','mname');
+  nm.textContent = who === 'me' ? (myName || 'You') : (peerName || 'Them');
+  w.appendChild(nm);
   const b   = mk('div', 'bub'); b.style.padding = '4px';
   const img = mk('img');
   img.src = url; img.loading = 'lazy';
